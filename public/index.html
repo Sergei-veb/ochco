@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Очко — мультиплеер</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a1a;
+      color: #eee;
+      padding: 16px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .hidden { display: none !important; }
+    
+    /* ЭКРАН ВХОДА */
+    #joinScreen {
+      max-width: 400px;
+      margin: 80px auto;
+      background: #2a2a2a;
+      padding: 24px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    #joinScreen h1 { font-size: 1.8rem; margin-bottom: 20px; }
+    #joinScreen input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: #1a1a1a;
+      color: #eee;
+      font-size: 1rem;
+    }
+    #joinScreen button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 12px;
+      background: #d4a017;
+      color: #1a1a1a;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    
+    /* ИГРОВОЙ ЭКРАН */
+    #gameScreen { 
+      max-width: 1200px; 
+      margin: 0 auto; 
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .table-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 8px 16px;
+      background: #2a2a2a;
+      border-radius: 8px;
+    }
+
+    /* КРУГЛЫЙ СТОЛ */
+    .table-container {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+      height: 600px;
+      margin: 20px auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .table-felt {
+      width: 350px;
+      height: 350px;
+      background: radial-gradient(circle, #2a6a4a 0%, #1a3a2a 100%);
+      border-radius: 50%;
+      border: 15px solid #4a2a1a;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8), inset 0 0 50px rgba(0,0,0,0.5);
+      position: absolute;
+      z-index: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* КОЛОДА В ЦЕНТРЕ */
+    .deck-center {
+      position: absolute;
+      width: 44px;
+      height: 60px;
+      background: repeating-linear-gradient(45deg, #1a3a6a, #1a3a6a 4px, #2a4a7a 4px, #2a4a7a 8px);
+      border: 2px solid #fff;
+      border-radius: 6px;
+      box-shadow: 2px 2px 0 #fff, 4px 4px 0 #1a3a6a, 6px 6px 10px rgba(0,0,0,0.5);
+      z-index: 2;
+    }
+
+    .players-circle {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      z-index: 3;
+    }
+
+    .player-seat {
+      position: absolute;
+      background: rgba(42, 42, 42, 0.95);
+      border: 2px solid #444;
+      border-radius: 12px;
+      padding: 10px;
+      min-width: 140px;
+      text-align: center;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+    }
+
+    .player-seat.active {
+      border-color: #d4a017;
+      box-shadow: 0 0 15px rgba(212, 160, 23, 0.5);
+      transform: scale(1.05) translate(-50%, -50%) !important;
+      z-index: 10;
+    }
+
+    .player-seat.me {
+      border-color: #4a8a4a;
+    }
+
+    .player-name { font-weight: bold; margin-bottom: 4px; font-size: 0.9rem; }
+    .total { font-size: 0.8rem; color: #d4a017; font-weight: bold; }
+    
+    .hand {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-top: 8px;
+      min-height: 56px;
+      position: relative;
+    }
+
+    /* СТИЛИ КАРТ */
+    .card {
+      width: 40px;
+      height: 56px;
+      background: #fff;
+      color: #222;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.9rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    }
+
+    .card.red { color: #c00; }
+    .card.back {
+      background: repeating-linear-gradient(45deg, #1a3a6a, #1a3a6a 4px, #2a4a7a 4px, #2a4a7a 8px);
+      color: transparent;
+    }
+
+    /* ПАНЕЛЬ ДЕЙСТВИЙ */
+    .actions { 
+      margin-top: 20px; 
+      display: flex; 
+      gap: 16px; 
+      width: 100%; 
+      max-width: 400px;
+      justify-content: center;
+    }
+    .actions button {
+      flex: 1;
+      padding: 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.2s;
+    }
+    .actions button:active { transform: scale(0.95); }
+    
+    .btn-hit { background: #d4a017; color: #1a2a1a; }
+    .btn-stand { background: #8a6a2a; color: #eee; }
+    .btn-next { background: #2a8a4a; color: #eee; }
+
+    /* БЛОК РЕЗУЛЬТАТОВ */
+    .result-box {
+      background: #1a2a3a;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 20px;
+      white-space: pre-wrap;
+      font-size: 1rem;
+      width: 100%;
+      max-width: 600px;
+      border-left: 4px solid #d4a017;
+      animation: fadeIn 0.5s ease-in-out;
+    }
+    .winner-text { font-size: 1.3rem; font-weight: bold; color: #4ade80; margin-bottom: 12px;}
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    #errorMsg { color: #f66; margin-top: 8px; font-size: 0.9rem; }
+
+    @media (max-width: 800px) {
+      .table-container { height: 500px; }
+      .table-felt { width: 250px; height: 250px; }
+      .player-seat { min-width: 110px; padding: 6px; }
+      .card { width: 30px; height: 42px; font-size: 0.7rem; }
+      .deck-center { width: 34px; height: 46px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="joinScreen">
+    <h1>🃏 Очко</h1>
+    <p style="margin-bottom:16px; color:#aaa; font-size:0.9rem;">2–5 игроков</p>
+    <input id="nameInput" placeholder="Ваше имя" maxlength="20">
+    <input id="tableInput" placeholder="ID стола" maxlength="10">
+    <button onclick="joinGame()">Войти за стол</button>
+    <div id="errorMsg"></div>
+  </div>
+
+  <div id="gameScreen" class="hidden">
+    <div class="table-header">
+      <span>Стол: <strong id="tableIdLabel"></strong></span>
+      <span id="phaseLabel"></span>
+    </div>
+
+    <div class="table-container" id="tableContainer">
+      <div class="table-felt">
+        <div class="deck-center" id="deckCenter"></div>
+      </div>
+      <div class="players-circle" id="playersArea"></div>
+    </div>
+
+    <div class="actions" id="actionBar"></div>
+    <div class="result-box hidden" id="resultBox"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let myId = null;
+    let currentTableId = null;
+    
+    // Для отслеживания новых карт и анимации
+    let renderedHands = {}; 
+
+    const pathMatch = window.location.pathname.match(/^\/room\/([A-Za-z0-9]+)$/);
+    if (pathMatch) document.getElementById('tableInput').value = pathMatch[1];
+
+    function joinGame() {
+      const name = document.getElementById('nameInput').value.trim() || 'Игрок';
+      const tableId = document.getElementById('tableInput').value.trim().toUpperCase();
+      if (!tableId) { document.getElementById('errorMsg').textContent = 'Введите ID стола'; return; }
+      currentTableId = tableId;
+      renderedHands = {}; // Сбрасываем при входе
+      socket.emit('joinTable', { tableId, playerName: name });
+    }
+
+    socket.on('connect', () => { myId = socket.id; });
+
+    socket.on('errorMsg', (msg) => {
+      document.getElementById('errorMsg').textContent = msg;
+    });
+
+    socket.on('tableState', (state) => {
+      document.getElementById('joinScreen').classList.add('hidden');
+      document.getElementById('gameScreen').classList.remove('hidden');
+      document.getElementById('tableIdLabel').textContent = state.id;
+      
+      document.getElementById('phaseLabel').textContent = 
+        state.phase === 'waiting' ? 'Ожидание игроков...' :
+        state.phase === 'playing' ? 'Игра идёт' : 'Раунд завершён';
+
+      // Если начался новый раунд (карт ни у кого нет), сбрасываем кэш
+      if (state.players.every(p => p.hand.length === 0)) {
+        renderedHands = {};
+      }
+
+      const playersArea = document.getElementById('playersArea');
+      playersArea.innerHTML = ''; // Перерисовываем стол
+
+      const numPlayers = state.players.length;
+      const isMobile = window.innerWidth <= 800;
+      const radius = isMobile ? 170 : 260; 
+
+      state.players.forEach((p, index) => {
+        const div = document.createElement('div');
+        let classes = 'player-seat';
+        if (p.id === state.currentPlayerId) classes += ' active';
+        if (p.id === myId) classes += ' me';
+        div.className = classes;
+        div.id = `seat-${p.id}`; // Даем ID для поиска координат
+
+        const angle = (index / numPlayers) * 2 * Math.PI - (Math.PI / 2); 
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+
+        div.style.left = `calc(50% + ${x}px)`;
+        div.style.top = `calc(50% + ${y}px)`;
+        
+        if (!div.classList.contains('active')) {
+          div.style.transform = `translate(-50%, -50%)`;
+        }
+
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'player-name';
+        // Убрали значки взрыва и руки
+        nameDiv.textContent = p.name + (p.id === myId ? ' (вы)' : '');
+          
+        const handDiv = document.createElement('div');
+        handDiv.className = 'hand';
+        handDiv.id = `hand-${p.id}`; // ID для руки
+        
+        const totalDiv = document.createElement('div');
+        totalDiv.className = 'total';
+        totalDiv.textContent = p.total !== null ? `Сумма: ${p.total}` : 'Сумма: ?';
+        
+        div.append(nameDiv, handDiv, totalDiv);
+        playersArea.appendChild(div);
+
+        // ЛОГИКА ОТРИСОВКИ И АНИМАЦИИ КАРТ
+        const prevHand = renderedHands[p.id] || [];
+        const currentHand = p.hand;
+
+        currentHand.forEach((card, i) => {
+          // Если карта новая, анимируем её полет от колоды
+          if (i >= prevHand.length) {
+            animateCardFromDeck(card, handDiv, p.id, i);
+          } else {
+            // Если карта уже была, просто рисуем её (например, при перевороте)
+            const cardEl = makeCard(card);
+            handDiv.appendChild(cardEl);
+          }
+        });
+
+        renderedHands[p.id] = JSON.parse(JSON.stringify(currentHand)); // Сохраняем текущее состояние
+      });
+
+      const actionBar = document.getElementById('actionBar');
+      actionBar.innerHTML = '';
+      
+      // Кнопки показываются, даже если перебрал (чтобы можно было взять еще)
+      if (state.phase === 'playing' && state.currentPlayerId === myId) {
+        const hitBtn = document.createElement('button');
+        hitBtn.className = 'btn-hit';
+        hitBtn.textContent = 'Взять карту';
+        hitBtn.onclick = () => socket.emit('hit');
+        const standBtn = document.createElement('button');
+        standBtn.className = 'btn-stand';
+        standBtn.textContent = 'Хватит';
+        standBtn.onclick = () => socket.emit('stand');
+        actionBar.append(hitBtn, standBtn);
+      } else if (state.phase === 'finished') {
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'btn-next';
+        nextBtn.textContent = 'Следующий раунд';
+        nextBtn.onclick = () => socket.emit('nextRound');
+        actionBar.appendChild(nextBtn);
+      }
+
+      const resultBox = document.getElementById('resultBox');
+      if (state.roundResult) {
+        resultBox.classList.remove('hidden');
+        let text = `<div class="winner-text">🏆 ${state.roundResult.winnerText}</div>`;
+        state.roundResult.players.forEach(r => {
+          let status = r.busted ? 'Перебор' : '';
+          text += `${r.name} (${r.total}): ${status}\n`;
+        });
+        resultBox.innerHTML = text;
+      } else {
+        resultBox.classList.add('hidden');
+      }
+
+      if (currentTableId) {
+        history.replaceState(null, '', `/room/${currentTableId}`);
+      }
+    });
+
+    // Функция для создания DOM-элемента карты
+    function makeCard(card) {
+      const div = document.createElement('div');
+      if (card.rank === '?') {
+        div.className = 'card back';
+        div.textContent = '';
+      } else {
+        div.className = 'card' + (['♥','♦'].includes(card.suit) ? ' red' : '');
+        div.textContent = card.rank + card.suit;
+      }
+      return div;
+    }
+
+    // ФУНКЦИЯ АНИМАЦИИ ПОЛЕТА ОТ КОЛОДЫ
+    function animateCardFromDeck(card, handContainer, playerId, index) {
+      const cardEl = makeCard(card);
+      cardEl.style.position = 'absolute'; // Временно вырываем из потока для полета
+      cardEl.style.zIndex = 100;
+      
+      // Находим координаты колоды в центре и координаты руки игрока
+      const deckEl = document.getElementById('deckCenter');
+      const seatEl = document.getElementById(`seat-${playerId}`);
+      
+      const deckRect = deckEl.getBoundingClientRect();
+      const seatRect = seatEl.getBoundingClientRect();
+
+      // Стартовая позиция (центр колоды)
+      const startX = deckRect.left + deckRect.width / 2 - 20;
+      const startY = deckRect.top + deckRect.height / 2 - 28;
+
+      // Конечная позиция (примерно туда, где будет карта в руке)
+      const endX = seatRect.left + seatRect.width / 2 - 20 + (index * 15);
+      const endY = seatRect.top + seatRect.height / 2 - 10;
+
+      // Ставим карту в начальную позицию
+      cardEl.style.left = `${startX}px`;
+      cardEl.style.top = `${startY}px`;
+      document.body.appendChild(cardEl);
+
+      // Анимация полета
+      const animation = cardEl.animate([
+        { transform: 'scale(0.5) rotate(0deg)', opacity: 0.8 },
+        { transform: 'scale(1.1) rotate(10deg)', opacity: 1, offset: 0.5 },
+        { transform: 'scale(1) rotate(0deg)', opacity: 1 }
+      ], {
+        duration: 500,
+        easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+        fill: 'forwards'
+      });
+
+      // Когда анимация завершится, добавляем карту в руку (в поток)
+      animation.onfinish = () => {
+        cardEl.remove(); // Удаляем летающую копию
+        handContainer.appendChild(makeCard(card)); // Добавляем нормальную карту в руку
+      };
+    }
+
+    window.addEventListener('load', () => {
+      if (pathMatch) {
+        document.getElementById('nameInput').focus();
+      }
+    });
+  </script>
+</body>
+</html>
